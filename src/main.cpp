@@ -69,14 +69,14 @@ void loop()
   // Send GPS Packet every 10 seconds
   if (everyNSeconds(gpsTimer, 10))
   {
-    LoRaPacket gpsPacket = LoRaPacket::createPacket(DEVICE_ID, 0x01, 0, "GPS Data");
+    LoRaPacket gpsPacket = LoRaPacket::createPacket(DEVICE_ID, 0x01, 2, "GPS Data");
     gpsPacket.sendPacket(gpsPacket);
   }
 
   // Press Button and Send SOS Packet
   if (checkButtonPress())
   {
-    LoRaPacket sosPacket = LoRaPacket::createPacket(DEVICE_ID, 0x02, 0, "SOS");
+    LoRaPacket sosPacket = LoRaPacket::createPacket(DEVICE_ID, 0x02, 1, "SOS");
     sosPacket.sendPacket(sosPacket);
   }
 }

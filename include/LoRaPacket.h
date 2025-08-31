@@ -30,5 +30,6 @@ struct __attribute__((packed)) LoRaPacket
     // Neighbor List Management
     static void updateNeighborList(const LoRaPacket &packet);
     static void printNeighborList();
+    void printSeenPackets();
 };
 #endif
