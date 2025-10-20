@@ -18,7 +18,7 @@ Functionality should include:
 // LoRa
 #define LORA_FREQ 433E6
 // Button
-#define BUTTON_PIN 26
+#define BUTTON_PIN 15
 
 HardwareSerial gpsSerial(2);
 TinyGPSPlus gps;
@@ -27,6 +27,8 @@ TinyGPSPlus gps;
 uint16_t DEVICE_ID;
 bool isButtonPressed = false;
 unsigned long gpsTimer = 0;
+String gpsCoordinates = "";
+String gpsTimestamp = "";
 
 // function declaration
 void initGPS();
@@ -48,12 +50,23 @@ void setup()
 
 void loop()
 {
+  // Read GPS Data
+  while (gpsSerial.available() > 0)
+  {
+    if (gps.encode(gpsSerial.read()))
+    {
+      if (gps.location.isValid())
+      {
+        gpsCoordinates = String(gps.location.lat(), 6) + "," + String(gps.location.lng(), 6) + "," + String(gps.altitude.meters());
+        gpsTimestamp = String(gps.date.day()) + "-" + String(gps.date.month()) + "-" + String(gps.date.year()) + " " + String(gps.time.hour()) + ":" + String(gps.time.minute()) + ":" + String(gps.time.second());
+      }
+    }
+  }
+
   // Receive and Forward Packets
   int packetCondition = LoRa.parsePacket();
   if (packetCondition == sizeof(LoRaPacket))
   {
-    // debugging
-    // Serial.println(String(packetCondition) + " before packet receive");
     LoRaPacket packet = LoRaPacket::receivePacket();
     if (packet.verifyCRC(packet))
     {
@@ -69,14 +82,15 @@ void loop()
   // Send GPS Packet every 10 seconds
   if (everyNSeconds(gpsTimer, 10))
   {
-    LoRaPacket gpsPacket = LoRaPacket::createPacket(DEVICE_ID, 0x01, 2, "GPS Data");
+    LoRaPacket gpsPacket = LoRaPacket::createPacket(DEVICE_ID, 0x01, 2, gpsCoordinates.c_str(), gpsTimestamp.c_str());
     gpsPacket.sendPacket(gpsPacket);
+    displayGPSInfo();
   }
 
   // Press Button and Send SOS Packet
   if (checkButtonPress())
   {
-    LoRaPacket sosPacket = LoRaPacket::createPacket(DEVICE_ID, 0x02, 1, "SOS");
+    LoRaPacket sosPacket = LoRaPacket::createPacket(DEVICE_ID, 0x02, 1, gpsCoordinates.c_str(), gpsTimestamp.c_str());
     sosPacket.sendPacket(sosPacket);
   }
 }
@@ -130,27 +144,23 @@ uint16_t setDeviceID()
 
 void displayGPSInfo()
 {
+  if (!gps.location.isValid())
+  {
+    Serial.println("No GPS Data Available");
+    return;
+  }
+  else if (!gps.date.isValid() || !gps.time.isValid())
+  {
+    Serial.println("No Date Available");
+    return;
+  }
+
+  Serial.println("\nGPS Info:");
   Serial.println("Latitude: " + String(gps.location.lat(), 6));
   Serial.println("Longitude: " + String(gps.location.lng(), 6));
   Serial.println("Altitude: " + String(gps.altitude.meters()));
-
-  if (gps.date.isValid())
-  {
-    Serial.println("Date: " + String(gps.date.month()) + "/" + String(gps.date.day()) + "/" + String(gps.date.year()));
-  }
-  else
-  {
-    Serial.println("Date: Not Available");
-  }
-
-  if (gps.time.isValid())
-  {
-    Serial.println("Time: " + String(gps.time.hour()) + ":" + String(gps.time.minute()) + ":" + String(gps.time.second()));
-  }
-  else
-  {
-    Serial.println("Time: Not Available");
-  }
+  Serial.println("Date: " + String(gps.date.month()) + "/" + String(gps.date.day()) + "/" + String(gps.date.year()));
+  Serial.println("Time: " + String(gps.time.hour()) + ":" + String(gps.time.minute()) + ":" + String(gps.time.second()));
 }
 
 bool everyNSeconds(unsigned long &lastTime, float seconds)

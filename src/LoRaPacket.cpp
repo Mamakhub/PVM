@@ -4,9 +4,9 @@
 #include <set>
 
 extern uint16_t DEVICE_ID;
-std::map<uint16_t, String> neighborList; // deviceID -> "lat,lng,alt"
-std::map<uint16_t, unsigned long> lastSeen;
-std::set<String> seenPackets;
+std::map<uint16_t, String> neighborList;    // deviceID -> "lat,lng,alt"
+std::map<uint16_t, unsigned long> lastSeen; // deviceID -> last seen timestamp
+std::set<String> seenPackets;               // [ [deviceID|type|payload], [deviceID|type|payload], ... ]
 
 // Neighbor List Management
 bool LoRaPacket::isPacketAlreadySeen(const LoRaPacket &packet)
@@ -49,14 +49,19 @@ uint16_t LoRaPacket::calculateCRC(const LoRaPacket &packet)
     return crc;
 }
 
-LoRaPacket LoRaPacket::createPacket(uint16_t deviceID, uint8_t type, uint8_t priority, const char *payload)
+LoRaPacket LoRaPacket::createPacket(uint16_t deviceID, uint8_t type, uint8_t priority, const char *payload, const char *timestamp)
 {
     LoRaPacket packet;
     packet.deviceID = deviceID;
     packet.type = type;
     packet.priority = priority;
-    strncpy(packet.payload, payload, MAX_PAYLOAD_SIZE);
+
+    strncpy(packet.payload, payload, MAX_PAYLOAD_SIZE - 1);
     packet.payload[MAX_PAYLOAD_SIZE - 1] = '\0';
+
+    strncpy(packet.timestamp, timestamp, MAX_TIMESTAMP_SIZE - 1);
+    packet.timestamp[MAX_TIMESTAMP_SIZE - 1] = '\0';
+
     packet.crc = LoRaPacket::calculateCRC(packet);
     return packet;
 }
@@ -75,6 +80,7 @@ void LoRaPacket::printPacket(const LoRaPacket &packet)
                    " | Priority: " + String(packet.priority) +
                    " | Payload: " + String(packet.payload) +
                    " | CRC: 0x" + String(packet.crc, HEX) +
+                   " | Timestamp: " + String(packet.timestamp) +
                    " |");
     Serial.println("------------------------------------------------------------------------------");
 }
@@ -86,7 +92,7 @@ void LoRaPacket::sendPacket(const LoRaPacket &packet)
     LoRa.write((uint8_t *)&packet, sizeof(LoRaPacket));
     LoRa.endPacket();
     if (packet.type == 0x02 && packet.deviceID == DEVICE_ID)
-        Serial.println("\033[31mSOS Packet Sent\033[0m");
+        Serial.println("\033[91mSOS Packet Sent\033[0m");
     else if (packet.type == 0x01 && packet.deviceID == DEVICE_ID)
         Serial.println("\033[32mGPS Packet Sent\033[0m");
 }
@@ -131,8 +137,10 @@ void LoRaPacket::updateNeighborList(const LoRaPacket &packet)
     if (packet.type == 0x01)
     {
         String gpsInfo = String(packet.payload);
+        String timestamp = String(packet.timestamp);
+
         neighborList[packet.deviceID] = gpsInfo;
-        lastSeen[packet.deviceID] = millis();
+        lastSeen[packet.deviceID] = timestamp.toInt();
     }
 }
 
