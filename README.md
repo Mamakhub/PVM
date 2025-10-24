@@ -204,7 +204,3 @@ MarineHack/
 - ✅ Neighbor device tracking
 - ✅ CRC error checking
 - ✅ Automatic device ID generation
-
-
-## License
-This project is open source. Please check the repository for license details.
