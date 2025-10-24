@@ -1,6 +1,6 @@
-# MarineHack - ESP32 GPS LoRa Communication System
+# Mamakhub - PVM
 
-A Personal Vehicle Monitor (PVM) system built on ESP32 that combines GPS tracking with LoRa mesh networking for maritime communication and emergency response.
+A Portect Vessel Module (PVM) system built on ESP32 that combines GPS tracking with LoRa mesh networking for maritime communication and emergency response.
 
 ## Project Overview
 
@@ -19,11 +19,8 @@ This project implements a mesh network of ESP32 devices that can:
 - **LoRa Radio Module** (SX1276/SX1278 compatible)
 - **Push Button** (for SOS functionality)
 - **Breadboard and Jumper Wires**
-
-### Optional Components
-- External GPS antenna for better reception
-- Case/enclosure for maritime environments
-- Battery pack for portable operation
+- **External GPS antenna** for better reception
+- **Battery pack**
 
 ## Hardware Connections
 
@@ -41,12 +38,12 @@ RX    →   GPIO 17 (TX2)
 ```
 LoRa      ESP32
 ----      -----
-VCC   →   3.3V
+3.3V  →   3.3V
 GND   →   GND
 SCK   →   GPIO 18
 MISO  →   GPIO 19
 MOSI  →   GPIO 23
-CS    →   GPIO 5
+NSS   →   GPIO 5
 RST   →   GPIO 14
 DIO0  →   GPIO 2
 ```
@@ -55,7 +52,7 @@ DIO0  →   GPIO 2
 ```
 Button    ESP32
 ------    -----
-One pin → GPIO 26
+One pin → GPIO 15
 Other pin → GND
 ```
 
@@ -149,7 +146,7 @@ if (everyNSeconds(gpsTimer, 10))  // Change 10 to desired seconds
    - Display neighbor information
 
 ### Emergency (SOS) Mode
-1. Press the emergency button (GPIO 26)
+1. Press the emergency button (GPIO 15)
 2. Device will send high-priority SOS packet
 3. All nearby devices will forward the SOS signal
 
@@ -208,41 +205,6 @@ MarineHack/
 - ✅ CRC error checking
 - ✅ Automatic device ID generation
 
-### Future Enhancements
-- 🔄 Web interface for configuration
-- 🔄 Battery level monitoring
-- 🔄 Improved packet routing algorithms
-- 🔄 Maritime weather integration
-
-## Technical Specifications
-
-- **Microcontroller**: ESP32-WROOM-32
-- **GPS Module**: NEO-6M (UART interface)
-- **Radio**: LoRa SX1276/SX1278 (433 MHz)
-- **Communication Range**: Up to 2km (line of sight)
-- **GPS Accuracy**: ±3 meters
-- **Power Consumption**: ~200mA active, <1mA deep sleep
-- **Operating Voltage**: 3.3V
 
 ## License
-
 This project is open source. Please check the repository for license details.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section above
-2. Create an issue on the GitHub repository
-3. Provide serial monitor output and hardware setup details
-
----
-
-**Note**: This system is designed for emergency communication and should not be relied upon as the sole means of maritime safety communication. Always carry proper marine safety equipment as required by local regulations.
