@@ -1,6 +1,6 @@
 /*
 This is the code for PVM
-In this first prototype, PVM connects to the GPS module and send location data to another PVM over LoRa.
+PVM connects to the GPS module and send location data over LoRa.
 Functionality should include:
 - GPS data parsing
 - LoRa transmission (Receive + Send)
@@ -19,14 +19,20 @@ Functionality should include:
 #define LORA_FREQ 433E6
 // Button
 #define BUTTON_PIN 15
+// SOS Led
+#define SOS_LED_PIN 4
+// Buzzer
+#define BUZZER_PIN 21
 
 HardwareSerial gpsSerial(2);
 TinyGPSPlus gps;
 
 // variables
 uint16_t DEVICE_ID;
-bool isButtonPressed = false;
+bool isSOStriggered = false;
+bool lastButtonState = HIGH;
 unsigned long gpsTimer = 0;
+unsigned long sosTimer = 0;
 String gpsCoordinates = "";
 String gpsTimestamp = "";
 
@@ -38,6 +44,7 @@ uint16_t setDeviceID();
 bool everyNSeconds(unsigned long &lastTime, float seconds);
 void displayGPSInfo();
 bool checkButtonPress();
+void playSOSMorseCode(); // SOS Morse code function
 
 void setup()
 {
@@ -46,6 +53,8 @@ void setup()
   initLoRa();
   initButton();
   DEVICE_ID = setDeviceID();
+  pinMode(SOS_LED_PIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
 }
 
 void loop()
@@ -80,18 +89,37 @@ void loop()
   }
 
   // Send GPS Packet every 10 seconds
-  if (everyNSeconds(gpsTimer, 10))
+  if (everyNSeconds(gpsTimer, 10) && !isSOStriggered)
   {
     LoRaPacket gpsPacket = LoRaPacket::createPacket(DEVICE_ID, 0x01, 2, gpsCoordinates.c_str(), gpsTimestamp.c_str());
     gpsPacket.sendPacket(gpsPacket);
     displayGPSInfo();
   }
 
-  // Press Button and Send SOS Packet
+  // Press Button will toggle SOS mode
   if (checkButtonPress())
   {
-    LoRaPacket sosPacket = LoRaPacket::createPacket(DEVICE_ID, 0x02, 1, gpsCoordinates.c_str(), gpsTimestamp.c_str());
-    sosPacket.sendPacket(sosPacket);
+    // Toggle SOS state
+    isSOStriggered = !isSOStriggered;
+  }
+
+  if (isSOStriggered)
+  {
+    // Play SOS Morse Code pattern on LED and Buzzer
+    playSOSMorseCode();
+
+    // Send SOS packet every 5 seconds
+    if (everyNSeconds(sosTimer, 5))
+    {
+      LoRaPacket sosPacket = LoRaPacket::createPacket(DEVICE_ID, 0x02, 1, gpsCoordinates.c_str(), gpsTimestamp.c_str());
+      sosPacket.sendPacket(sosPacket);
+    }
+  }
+  else
+  {
+    // Turn off LED and Buzzer when SOS is not active
+    digitalWrite(SOS_LED_PIN, LOW);
+    digitalWrite(BUZZER_PIN, LOW);
   }
 }
 
@@ -176,19 +204,92 @@ bool everyNSeconds(unsigned long &lastTime, float seconds)
 
 bool checkButtonPress()
 {
-  bool pressed = digitalRead(BUTTON_PIN) == LOW;
+  bool currentButtonState = digitalRead(BUTTON_PIN);
 
-  // Check for button press
-  if (pressed && !isButtonPressed)
+  // Change in state (from HIGH to LOW)
+  if (lastButtonState == HIGH && currentButtonState == LOW)
   {
-    isButtonPressed = true;
-    return true;
+    // Short delay
+    delay(50);
+    currentButtonState = digitalRead(BUTTON_PIN);
+
+    // Confirm it's still pressed
+    if (currentButtonState == LOW)
+    {
+      lastButtonState = currentButtonState;
+      // Button was just pressed
+      return true;
+    }
   }
-  // Release button
-  else if (!pressed)
-  {
-    isButtonPressed = false;
-  }
-  // Button is not pressed
+
+  lastButtonState = currentButtonState;
+  // Button is not pressed or already processed
   return false;
+}
+
+void playSOSMorseCode()
+{
+  // Morse code durations
+  const int DOT = 200;
+  const int DASH = 600;
+  const int GAP = 200;
+  const int LETTER_GAP = 600;
+  const int WORD_GAP = 2000;
+
+  // SOS Pattern: S(. . .) O(- - -) S(. . .)
+  // 1=ON, 0=OFF, negative values = special gaps
+  static const int sosPattern[] = {
+      // S - three dots
+      DOT, GAP, DOT, GAP, DOT, -LETTER_GAP,
+      // O - three dashes
+      DASH, GAP, DASH, GAP, DASH, -LETTER_GAP,
+      // S - three dots
+      DOT, GAP, DOT, GAP, DOT, -WORD_GAP};
+
+  static const int patternLength = sizeof(sosPattern) / sizeof(sosPattern[0]);
+  static int currentStep = 0;
+  static unsigned long stepStartTime = 0;
+  static bool isTurnedOn = true;
+
+  unsigned long currentTime = millis();
+
+  // Initialize on first run
+  if (stepStartTime == 0)
+  {
+    stepStartTime = currentTime;
+    isTurnedOn = true;
+    currentStep = 0;
+  }
+
+  int duration = abs(sosPattern[currentStep]);
+  bool shouldBeOn = (sosPattern[currentStep] > 0) && isTurnedOn;
+
+  // Control LED and Buzzer
+  if (shouldBeOn)
+  {
+    digitalWrite(SOS_LED_PIN, HIGH);
+    digitalWrite(BUZZER_PIN, HIGH);
+  }
+  else
+  {
+    digitalWrite(SOS_LED_PIN, LOW);
+    digitalWrite(BUZZER_PIN, LOW);
+  }
+
+  // Check if it's time to move to next step
+  if (currentTime - stepStartTime >= duration)
+  {
+    stepStartTime = currentTime;
+    currentStep++;
+
+    // Toggle between ON and OFF for each step
+    isTurnedOn = !isTurnedOn;
+
+    // Reset pattern when finished
+    if (currentStep >= patternLength)
+    {
+      currentStep = 0;
+      isTurnedOn = true;
+    }
+  }
 }
